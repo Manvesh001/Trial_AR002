@@ -165,9 +165,6 @@
         console.error('GLTF load error', err);
       });
 
-      // --- Simple rotation for demo (if model exists, rotate it)
-      const clock = new THREE.Clock();
-
       // --- Audio (unlock on first tap)
       const clickAudio = new Audio('./click.wav');
       clickAudio.preload = 'auto';
