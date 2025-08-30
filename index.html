@@ -15,6 +15,7 @@
             margin: 0;
             overflow: hidden;
             font-family: 'Inter', sans-serif;
+            background-color: #000; /* Explicitly set background */
         }
 
         #overlay {
@@ -30,6 +31,12 @@
             padding: 1.5rem;
             cursor: pointer;
             transition: opacity 0.5s ease;
+        }
+
+        /* Class to hide the overlay */
+        #overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
         }
 
         #overlay-content {
@@ -75,126 +82,126 @@
             <p>Tap anywhere to begin.<br>Point your camera at the Hiro marker.</p>
         </div>
     </div>
-    <div id="info">Initializing AR...</div>
+    <div id="info">Initializing...</div>
 
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'GLTFLoader';
 
-        window.THREE = THREE;
+        window.THREE = THREE; // Expose THREE for ar-threex.js
 
-        // --- Dynamically load AR.js to ensure THREE is ready first ---
+        // --- Global variables ---
+        let scene, camera, renderer, arToolkitSource, arToolkitContext, markerRoot, loadedModel;
+        const clock = new THREE.Clock();
+
+        // --- Load AR.js dynamically ---
         const arScript = document.createElement('script');
         arScript.src = 'https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex.js';
         document.head.appendChild(arScript);
-        arScript.onload = main;
-
-        async function main() {
-            const scene = new THREE.Scene();
-            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        
+        arScript.onload = () => {
+            // After the AR library is loaded, set up the initial scene
+            initScene();
+        };
+        
+        function initScene() {
+            scene = new THREE.Scene();
+            camera = new THREE.Camera(); // AR.js will manage this camera's projection
             scene.add(camera);
 
-            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer = new THREE.WebGLRenderer({ antiasias: true, alpha: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
             
-            // --- Lighting ---
-            scene.add(new THREE.AmbientLight(0xdddddd));
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(1, 1, 1).normalize();
+            // --- Improved Lighting ---
+            scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1.5));
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(0.5, 1, 0.7).normalize();
             scene.add(directionalLight);
+
+            // Set up a root group for the marker content
+            markerRoot = new THREE.Group();
+            scene.add(markerRoot);
             
-            // --- AR.js Setup ---
-            const arToolkitSource = new THREEx.ArToolkitSource({ sourceType: 'webcam' });
-            const arToolkitContext = new THREEx.ArToolkitContext({
+            // Load the 3D model
+            loadModel();
+
+            // Setup UI
+            document.getElementById('info').innerText = 'Please tap screen to start';
+            const overlay = document.getElementById('overlay');
+            overlay.addEventListener('click', () => {
+                overlay.classList.add('hidden'); // Use class to hide overlay smoothly
+                startAR();
+            });
+        }
+
+        async function startAR() {
+            document.getElementById('info').innerText = 'Starting camera...';
+
+            arToolkitSource = new THREEx.ArToolkitSource({ sourceType: 'webcam', sourceWidth: window.innerWidth, sourceHeight: window.innerHeight });
+            arToolkitContext = new THREEx.ArToolkitContext({
                 cameraParametersUrl: 'https://raw.githack.com/AR-js-org/AR.js/master/data/data/camera_para.dat',
                 detectionMode: 'mono',
             });
 
-            // --- Robust Resize Handler ---
-            function onResize() {
-                arToolkitSource.onResizeElement();
-                arToolkitSource.copyElementSizeTo(renderer.domElement);
-                if (arToolkitContext.arController !== null) {
-                    arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas);
-                }
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            }
-
-            arToolkitSource.init(onResize);
+            arToolkitSource.init(() => {
+                // Use a timeout to ensure the video element is ready before the first resize.
+                setTimeout(() => onResize(), 500);
+            });
             window.addEventListener('resize', onResize);
             
             await arToolkitContext.init();
             
             camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
-            camera.matrixAutoUpdate = false; // Important: AR.js will manage the camera matrix
-
-            // --- Marker Setup ---
-            const markerRoot = new THREE.Group();
-            scene.add(markerRoot);
             
-            new THREEx.ArMarkerControls(arToolkitContext, camera, {
+            // --- Marker Controls ---
+            new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
                 type: 'preset',
                 preset: 'hiro',
-                markerMatrixType: 'world',
             });
 
-            // --- Scene Content ---
-            const infoDiv = document.getElementById('info');
-            infoDiv.innerText = 'Point camera at the HIRO marker';
-            
+            // Start the render loop
+            render();
+        }
+
+        function loadModel() {
             const gltfLoader = new GLTFLoader();
             gltfLoader.load(
-                // IMPORTANT: Using a remotely hosted model to avoid local file errors.
-                // Replace this URL with the URL of your own model hosted on GitHub or another service.
                 'https://raw.githack.com/AR-js-org/AR.js/master/aframe/examples/image-tracking/nft/trex/scene.gltf', 
                 (gltf) => {
-                    const gltfModel = gltf.scene;
-                    gltfModel.scale.set(0.1, 0.1, 0.1); // Adjust scale to fit the model
-                    gltfModel.position.y = 0; // Adjust position to sit on the marker
-                    markerRoot.add(gltfModel);
-                    infoDiv.innerText = 'Model loaded! Marker ready.';
-                    console.log('GLTF model loaded successfully.');
+                    loadedModel = gltf.scene;
+                    loadedModel.scale.set(0.1, 0.1, 0.1);
+                    loadedModel.position.y = 0; // Model sits on the marker
+                    markerRoot.add(loadedModel);
+                    console.log('GLTF model loaded.');
                 },
                 undefined,
-                (error) => {
-                    console.error('An error happened while loading the GLTF model:', error);
-                    infoDiv.innerText = 'Error: Could not load 3D model.';
-                }
+                (error) => { console.error('Error loading GLTF model:', error); }
             );
+        }
 
-            // --- UI Interaction ---
-            const overlay = document.getElementById('overlay');
-            overlay.addEventListener('click', () => {
-                overlay.style.opacity = '0';
-                setTimeout(() => { overlay.style.display = 'none'; }, 500);
-                console.log("UI unlocked, AR starting.");
-                // To re-enable sound, uncomment the line below and make sure
-                // the sound file is hosted online with a full URL.
-                // new Audio('FULL_URL_TO_YOUR/click.wav').play().catch(()=>{});
-            });
-            
-            // --- Render Loop ---
-            const clock = new THREE.Clock();
-            function render() {
-                requestAnimationFrame(render);
-
-                if (arToolkitSource.ready === false) return;
-                
-                arToolkitContext.update(arToolkitSource.domElement);
-                camera.updateMatrixWorld(true);
-
-                // Animate the model when the marker is visible
-                if (markerRoot.children.length > 0) { // Check if model is added
-                     markerRoot.children[0].rotation.y += clock.getDelta() * 0.5;
-                }
-                
-                renderer.render(scene, camera);
+        function onResize() {
+            arToolkitSource.onResizeElement();
+            arToolkitSource.copyElementSizeTo(renderer.domElement);
+            if (arToolkitContext.arController !== null) {
+                arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas);
             }
-            render();
+        }
+            
+        function render() {
+            requestAnimationFrame(render);
+            if (arToolkitSource && arToolkitSource.ready) {
+                arToolkitContext.update(arToolkitSource.domElement);
+                scene.visible = camera.visible;
+            }
+
+            // Animate the model when it's loaded and the marker is visible
+            if (loadedModel && markerRoot.visible) {
+                loadedModel.rotation.y += clock.getDelta() * 0.5;
+            }
+            
+            renderer.render(scene, camera);
         }
     </script>
 </body>
