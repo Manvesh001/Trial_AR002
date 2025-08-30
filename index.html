@@ -152,7 +152,7 @@
       // --- GLTF model loader (replace model.glb with your file)
       const gltfLoader = new GLTFLoader();
       let gltfModel = null;
-      gltfLoader.load('./model.glb', (gltf) => {
+      gltfLoader.load('./model.gltf', (gltf) => {
         gltfModel = gltf.scene;
         // Adjust scale / position to sit nicely above marker
         gltfModel.scale.set(1.2, 1.2, 1.2);
