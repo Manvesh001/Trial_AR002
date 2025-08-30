@@ -67,151 +67,158 @@
     import { GLTFLoader } from 'GLTFLoader';
     import 'AR'; // Import AR.js for marker-based AR functionality
 
-    // --- Basic three.js scene + renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.domElement.style.position = 'absolute';
-    renderer.domElement.style.top = '0px';
-    document.body.appendChild(renderer.domElement);
-
-    const scene = new THREE.Scene();
-
-    // Camera used by AR.js (replaceable by ARToolkit)
-    const camera = new THREE.Camera();
-    scene.add(camera);
-
-    // Light (basic)
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(0, 0.7, 0.7).normalize();
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0x666666));
-
-    // --- ARToolkit source (webcam)
-    const arSource = new THREEx.ArToolkitSource({
-      sourceType: 'webcam',
+    // Wait for Three.js and AR.js to be ready before starting the app
+    window.addEventListener('load', function() {
+      main();
     });
 
-    function onResize() {
-      arSource.onResizeElement();
-      arSource.copyElementSizeTo(renderer.domElement);
-      if (arContext.arController !== null) {
-        arSource.copyElementSizeTo(arContext.arController.canvas);
+    async function main() {
+      // --- Basic three.js scene + renderer
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.domElement.style.position = 'absolute';
+      renderer.domElement.style.top = '0px';
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+
+      // Camera used by AR.js (replaceable by ARToolkit)
+      const camera = new THREE.Camera();
+      scene.add(camera);
+
+      // Light (basic)
+      const light = new THREE.DirectionalLight(0xffffff, 1);
+      light.position.set(0, 0.7, 0.7).normalize();
+      scene.add(light);
+      scene.add(new THREE.AmbientLight(0x666666));
+
+      // --- ARToolkit source (webcam)
+      const arSource = new THREEx.ArToolkitSource({
+        sourceType: 'webcam',
+      });
+
+      function onResize() {
+        arSource.onResizeElement();
+        arSource.copyElementSizeTo(renderer.domElement);
+        if (arContext.arController !== null) {
+          arSource.copyElementSizeTo(arContext.arController.canvas);
+        }
       }
-    }
 
-    arSource.init(function onReady() {
-      onResize();
-    });
+      arSource.init(function onReady() {
+        onResize();
+      });
 
-    window.addEventListener('resize', function () {
-      onResize();
-    });
+      window.addEventListener('resize', function () {
+        onResize();
+      });
 
-    // --- ARToolkit context
-    const arContext = new THREEx.ArToolkitContext({
-      cameraParametersUrl: 'https://raw.githack.com/AR-js-org/AR.js/master/data/data/camera_para.dat',
-      detectionMode: 'mono',
-    });
+      // --- ARToolkit context
+      const arContext = new THREEx.ArToolkitContext({
+        cameraParametersUrl: 'https://raw.githack.com/AR-js-org/AR.js/master/data/data/camera_para.dat',
+        detectionMode: 'mono',
+      });
 
-    // Initialize it
-    await new Promise(resolve => arContext.init(resolve));
+      // Initialize it
+      await new Promise(resolve => arContext.init(resolve));
 
-    // Copy projection matrix to camera when ready
-    camera.projectionMatrix.copy(arContext.getProjectionMatrix());
+      // Copy projection matrix to camera when ready
+      camera.projectionMatrix.copy(arContext.getProjectionMatrix());
 
-    // --- Marker controls (custom QR code pattern)
-    const markerRoot = new THREE.Group();
-    scene.add(markerRoot);
+      // --- Marker controls (custom QR code pattern)
+      const markerRoot = new THREE.Group();
+      scene.add(markerRoot);
 
-    const markerControls = new THREEx.ArMarkerControls(arContext, markerRoot, {
-      type: 'pattern',
-      // Replace with your custom QR pattern file
-      patternUrl: './pattern-qr.patt',
-      changeMatrixMode: 'modelViewMatrix',
-    });
+      const markerControls = new THREEx.ArMarkerControls(arContext, markerRoot, {
+        type: 'pattern',
+        // Replace with your custom QR pattern file
+        patternUrl: './pattern-qr.patt',
+        changeMatrixMode: 'modelViewMatrix',
+      });
 
-    // --- Add a visible fallback box to confirm marker detection
-    const boxGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-    const boxMat = new THREE.MeshStandardMaterial({ color: 0xff3333, metalness: 0.1, roughness: 0.8 });
-    const fallbackBox = new THREE.Mesh(boxGeo, boxMat);
-    fallbackBox.position.set(0, 0.25, 0);
-    markerRoot.add(fallbackBox);
+      // --- Add a visible fallback box to confirm marker detection
+      const boxGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+      const boxMat = new THREE.MeshStandardMaterial({ color: 0xff3333, metalness: 0.1, roughness: 0.8 });
+      const fallbackBox = new THREE.Mesh(boxGeo, boxMat);
+      fallbackBox.position.set(0, 0.25, 0);
+      markerRoot.add(fallbackBox);
 
-    // --- GLTF model loader (replace model.glb with your file)
-    const gltfLoader = new GLTFLoader();
-    let gltfModel = null;
-    gltfLoader.load('./model.glb', (gltf) => {
-      gltfModel = gltf.scene;
-      // Adjust scale / position to sit nicely above marker
-      gltfModel.scale.set(1.2, 1.2, 1.2);
-      gltfModel.position.set(0, 0.15, 0);
-      markerRoot.add(gltfModel);
-      console.log('GLTF loaded');
-    }, (xhr) => {
-      // progress
-    }, (err) => {
-      console.error('GLTF load error', err);
-    });
+      // --- GLTF model loader (replace model.glb with your file)
+      const gltfLoader = new GLTFLoader();
+      let gltfModel = null;
+      gltfLoader.load('./model.glb', (gltf) => {
+        gltfModel = gltf.scene;
+        // Adjust scale / position to sit nicely above marker
+        gltfModel.scale.set(1.2, 1.2, 1.2);
+        gltfModel.position.set(0, 0.15, 0);
+        markerRoot.add(gltfModel);
+        console.log('GLTF loaded');
+      }, (xhr) => {
+        // progress
+      }, (err) => {
+        console.error('GLTF load error', err);
+      });
 
-    // --- Simple rotation for demo (if model exists, rotate it)
-    const clock = new THREE.Clock();
+      // --- Simple rotation for demo (if model exists, rotate it)
+      const clock = new THREE.Clock();
 
-    // --- Audio (unlock on first tap)
-    const clickAudio = new Audio('./click.wav');
-    clickAudio.preload = 'auto';
+      // --- Audio (unlock on first tap)
+      const clickAudio = new Audio('./click.wav');
+      clickAudio.preload = 'auto';
 
-    // Overlay to require a user gesture to unlock audio / confirm camera
-    const overlay = document.createElement('div');
-    overlay.id = 'overlay';
-    overlay.innerHTML = 'Tap to start AR<br><small>Allow camera access and point at your QR marker</small>';
-    document.body.appendChild(overlay);
+      // Overlay to require a user gesture to unlock audio / confirm camera
+      const overlay = document.createElement('div');
+      overlay.id = 'overlay';
+      overlay.innerHTML = 'Tap to start AR<br><small>Allow camera access and point at your QR marker</small>';
+      document.body.appendChild(overlay);
 
-    overlay.addEventListener('click', () => {
-      overlay.style.display = 'none';
-      clickAudio.play().catch(() => {});
-    });
-
-    // Also hide overlay automatically once video stream is ready
-    const videoChecker = setInterval(() => {
-      const v = document.querySelector('video');
-      if (v && v.readyState >= 2) {
+      overlay.addEventListener('click', () => {
         overlay.style.display = 'none';
-        clearInterval(videoChecker);
-      }
-    }, 500);
+        clickAudio.play().catch(() => {});
+      });
 
-    // --- Render loop
-    function render() {
-      requestAnimationFrame(render);
+      // Also hide overlay automatically once video stream is ready
+      const videoChecker = setInterval(() => {
+        const v = document.querySelector('video');
+        if (v && v.readyState >= 2) {
+          overlay.style.display = 'none';
+          clearInterval(videoChecker);
+        }
+      }, 500);
 
-      if (arSource.ready === false) {
+      // --- Render loop
+      function render() {
+        requestAnimationFrame(render);
+
+        if (arSource.ready === false) {
+          renderer.render(scene, camera);
+          return;
+        }
+
+        // Update AR context from source
+        arContext.update(arSource.domElement);
+
+        // markerRoot.visible is set by markerControls automatically
+        // Optional: hide fallbackBox once real model loaded
+        if (gltfModel) fallbackBox.visible = false;
+
+        // Animation
+        const dt = clock.getDelta();
+        if (gltfModel) gltfModel.rotation.y += dt * 0.6;
+        else fallbackBox.rotation.y += dt * 0.8;
+
         renderer.render(scene, camera);
-        return;
       }
 
-      // Update AR context from source
-      arContext.update(arSource.domElement);
+      render();
 
-      // markerRoot.visible is set by markerControls automatically
-      // Optional: hide fallbackBox once real model loaded
-      if (gltfModel) fallbackBox.visible = false;
-
-      // Animation
-      const dt = clock.getDelta();
-      if (gltfModel) gltfModel.rotation.y += dt * 0.6;
-      else fallbackBox.rotation.y += dt * 0.8;
-
-      renderer.render(scene, camera);
+      // Debug info
+      const info = document.createElement('div');
+      info.id = 'info';
+      info.innerText = 'Point camera at your QR code marker';
+      document.body.appendChild(info);
     }
-
-    render();
-
-    // Debug info
-    const info = document.createElement('div');
-    info.id = 'info';
-    info.innerText = 'Point camera at your QR code marker';
-    document.body.appendChild(info);
   </script>
 </head>
 
