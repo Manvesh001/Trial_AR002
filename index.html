@@ -59,11 +59,14 @@
   <!-- A-Frame library -->
   <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
 
-  <!-- Load THREE.js first -->
+  <!-- Load THREE.js first and expose it globally -->
   <script type="module">
     import * as THREE from 'three';
     import { GLTFLoader } from 'GLTFLoader';
-    
+
+    // Expose THREE globally for AR.js to access
+    window.THREE = THREE;
+
     // Load AR.js library after THREE.js
     const arScript = document.createElement('script');
     arScript.src = 'https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex.js';
