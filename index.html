@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <title>WebAR with Custom Marker</title>
+    <title>WebAR - Mobile Ready</title>
+    <!-- This viewport tag is critical for mobile compatibility -->
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -10,8 +11,8 @@
     <style>
         html, body {
             height: 100%;
+            width: 100%;
             margin: 0;
-            background: #000;
             overflow: hidden;
             font-family: 'Inter', sans-serif;
         }
@@ -27,7 +28,6 @@
             z-index: 10;
             text-align: center;
             padding: 1.5rem;
-            -webkit-tap-highlight-color: transparent;
             cursor: pointer;
             transition: opacity 0.5s ease;
         }
@@ -39,18 +39,9 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             max-width: 400px;
         }
-
-        #overlay h1 {
-            font-size: 1.5rem;
-            margin: 0 0 0.5rem 0;
-            font-weight: 700;
-        }
-
-        #overlay p {
-            margin: 0;
-            font-size: 1rem;
-            color: #ccc;
-        }
+        
+        #overlay h1 { font-size: 1.5rem; margin: 0 0 0.5rem 0; font-weight: 700; }
+        #overlay p { margin: 0; font-size: 1rem; color: #ccc; }
 
         #info {
             position: fixed;
@@ -64,15 +55,9 @@
             font-size: 13px;
             z-index: 11;
         }
-
-        canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
     </style>
 
-    <!-- Importmap for Three.js modules -->
+    <!-- Using CDN for Three.js to ensure it's always available -->
     <script type="importmap">
     {
         "imports": {
@@ -84,162 +69,129 @@
 </head>
 
 <body>
-    <!-- UI Overlay to request user interaction for camera and audio -->
     <div id="overlay">
         <div id="overlay-content">
             <h1>Start Augmented Reality</h1>
             <p>Tap anywhere to begin.<br>Point your camera at the Hiro marker.</p>
         </div>
     </div>
-
-    <!-- On-screen debug info -->
     <div id="info">Initializing AR...</div>
 
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'GLTFLoader';
 
-        // --- Expose THREE globally (required by the old ar-threex.js script) ---
         window.THREE = THREE;
 
-        // --- Dynamically load the AR.js library after THREE is ready ---
+        // --- Dynamically load AR.js to ensure THREE is ready first ---
         const arScript = document.createElement('script');
         arScript.src = 'https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex.js';
         document.head.appendChild(arScript);
-        
-        // --- Wait for AR.js to load before starting the main application ---
-        arScript.onload = () => {
-            main();
-        };
+        arScript.onload = main;
 
         async function main() {
             const scene = new THREE.Scene();
-            const camera = new THREE.Camera(); // This camera is a placeholder, AR.js controls the actual projection
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             scene.add(camera);
 
             const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.domElement.style.position = 'absolute';
-            renderer.domElement.style.top = '0px';
             document.body.appendChild(renderer.domElement);
             
             // --- Lighting ---
-            scene.add(new THREE.AmbientLight(0xcccccc));
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
-            directionalLight.position.set(0.5, 1, 0.7).normalize();
+            scene.add(new THREE.AmbientLight(0xdddddd));
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(1, 1, 1).normalize();
             scene.add(directionalLight);
             
             // --- AR.js Setup ---
-            const arSource = new THREEx.ArToolkitSource({ sourceType: 'webcam' });
-            
-            // FIX: The error is caused by AR.js trying to load local files.
-            // We fix this by pointing to a valid, full URL for the camera parameters.
-            const arContext = new THREEx.ArToolkitContext({
+            const arToolkitSource = new THREEx.ArToolkitSource({ sourceType: 'webcam' });
+            const arToolkitContext = new THREEx.ArToolkitContext({
                 cameraParametersUrl: 'https://raw.githack.com/AR-js-org/AR.js/master/data/data/camera_para.dat',
                 detectionMode: 'mono',
             });
 
-            // --- Initialize AR Source (Webcam) ---
-            arSource.init(() => {
-                // Wait a moment for video to be established before resizing
-                setTimeout(() => onResize(), 100); 
-            });
+            // --- Robust Resize Handler ---
+            function onResize() {
+                arToolkitSource.onResizeElement();
+                arToolkitSource.copyElementSizeTo(renderer.domElement);
+                if (arToolkitContext.arController !== null) {
+                    arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas);
+                }
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
 
-            // --- Initialize AR Context (Detection Engine) ---
-            await arContext.init();
+            arToolkitSource.init(onResize);
+            window.addEventListener('resize', onResize);
             
-            // Link the AR camera projection matrix to our Three.js camera
-            camera.projectionMatrix.copy(arContext.getProjectionMatrix());
+            await arToolkitContext.init();
+            
+            camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
+            camera.matrixAutoUpdate = false; // Important: AR.js will manage the camera matrix
 
             // --- Marker Setup ---
             const markerRoot = new THREE.Group();
             scene.add(markerRoot);
             
-            // FIX: Changed from a custom 'pattern' marker to a built-in 'preset'.
-            // This avoids loading another local file (pattern-qr.patt) and makes the demo work out-of-the-box.
-            new THREEx.ArMarkerControls(arContext, markerRoot, {
+            new THREEx.ArMarkerControls(arToolkitContext, camera, {
                 type: 'preset',
-                preset: 'hiro', // Using the standard 'hiro' marker.
+                preset: 'hiro',
+                markerMatrixType: 'world',
             });
 
-            markerRoot.visible = false; // Start with the marker content hidden
-
             // --- Scene Content ---
-            // A fallback box to show if the main model fails to load
-            const fallbackBox = new THREE.Mesh(
-                new THREE.BoxGeometry(0.8, 0.8, 0.8),
-                new THREE.MeshStandardMaterial({ color: 0xff4444, roughness: 0.8 })
-            );
-            fallbackBox.position.y = 0.4;
-            markerRoot.add(fallbackBox);
-
-            // GLTF model loader
             const infoDiv = document.getElementById('info');
             infoDiv.innerText = 'Point camera at the HIRO marker';
             
             const gltfLoader = new GLTFLoader();
             gltfLoader.load(
-                './model.glb', // Your 3D model file
+                // IMPORTANT: Using a remotely hosted model to avoid local file errors.
+                // Replace this URL with the URL of your own model hosted on GitHub or another service.
+                'https://raw.githack.com/AR-js-org/AR.js/master/aframe/examples/image-tracking/nft/trex/scene.gltf', 
                 (gltf) => {
                     const gltfModel = gltf.scene;
-                    gltfModel.scale.set(0.4, 0.4, 0.4); // Adjust scale to fit your model
-                    gltfModel.position.y = 0.5; // Adjust position to sit on the marker
+                    gltfModel.scale.set(0.1, 0.1, 0.1); // Adjust scale to fit the model
+                    gltfModel.position.y = 0; // Adjust position to sit on the marker
                     markerRoot.add(gltfModel);
-                    
-                    // Hide the red fallback box now that the real model is loaded
-                    fallbackBox.visible = false;
                     infoDiv.innerText = 'Model loaded! Marker ready.';
                     console.log('GLTF model loaded successfully.');
                 },
-                undefined, // onProgress callback (optional)
+                undefined,
                 (error) => {
                     console.error('An error happened while loading the GLTF model:', error);
                     infoDiv.innerText = 'Error: Could not load 3D model.';
                 }
             );
 
-            // --- Audio ---
-            // Note: Audio will only play after the user has interacted with the page
-            const clickAudio = new Audio('./click.wav');
-            clickAudio.preload = 'auto';
-
             // --- UI Interaction ---
             const overlay = document.getElementById('overlay');
             overlay.addEventListener('click', () => {
                 overlay.style.opacity = '0';
-                setTimeout(() => overlay.style.display = 'none', 500);
-                
-                // Play a silent sound to unlock audio context for the browser
-                clickAudio.play().catch(() => {});
+                setTimeout(() => { overlay.style.display = 'none'; }, 500);
                 console.log("UI unlocked, AR starting.");
+                // To re-enable sound, uncomment the line below and make sure
+                // the sound file is hosted online with a full URL.
+                // new Audio('FULL_URL_TO_YOUR/click.wav').play().catch(()=>{});
             });
-
-            // --- Handle Window Resizing ---
-            window.addEventListener('resize', onResize);
-            function onResize() {
-                arSource.onResizeElement();
-                arSource.copyElementSizeTo(renderer.domElement);
-                if (arContext.arController !== null) {
-                    arSource.copyElementSizeTo(arContext.arController.canvas);
-                }
-            }
             
             // --- Render Loop ---
-            const clock = new THREE.Clock(); // CRITICAL FIX: The clock was missing
+            const clock = new THREE.Clock();
             function render() {
                 requestAnimationFrame(render);
 
-                if (!arSource.ready) return;
-
-                arContext.update(arSource.domElement);
+                if (arToolkitSource.ready === false) return;
                 
-                // Animate the root group (which contains the model) when visible
-                if (markerRoot.visible) {
-                    const deltaTime = clock.getDelta();
-                    markerRoot.rotation.y += deltaTime * 0.5; // Rotate the whole marker group
-                }
+                arToolkitContext.update(arToolkitSource.domElement);
+                camera.updateMatrixWorld(true);
 
+                // Animate the model when the marker is visible
+                if (markerRoot.children.length > 0) { // Check if model is added
+                     markerRoot.children[0].rotation.y += clock.getDelta() * 0.5;
+                }
+                
                 renderer.render(scene, camera);
             }
             render();
