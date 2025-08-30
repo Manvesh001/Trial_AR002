@@ -119,9 +119,9 @@
         onResize();
       });
 
-      // --- ARToolkit context
+      // --- ARToolkit context with custom camera parameters
       const arContext = new THREEx.ArToolkitContext({
-        cameraParametersUrl: 'https://raw.githack.com/AR-js-org/AR.js/master/data/data/camera_para.dat',
+        cameraParametersUrl: './data/camera_para.dat',  // Path to your custom camera_para.dat file
         detectionMode: 'mono',
       });
 
@@ -152,7 +152,7 @@
       // --- GLTF model loader (replace model.glb with your file)
       const gltfLoader = new GLTFLoader();
       let gltfModel = null;
-      gltfLoader.load('./model.gltf', (gltf) => {
+      gltfLoader.load('./model.glb', (gltf) => {
         gltfModel = gltf.scene;
         // Adjust scale / position to sit nicely above marker
         gltfModel.scale.set(1.2, 1.2, 1.2);
