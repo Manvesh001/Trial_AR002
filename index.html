@@ -51,8 +51,7 @@
     {
       "imports": {
         "three": "https://unpkg.com/three@0.179.1/build/three.module.js",
-        "GLTFLoader": "https://unpkg.com/three@0.179.1/examples/jsm/loaders/GLTFLoader.js",
-        "AR": "https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex.js"
+        "GLTFLoader": "https://unpkg.com/three@0.179.1/examples/jsm/loaders/GLTFLoader.js"
       }
     }
   </script>
@@ -60,17 +59,20 @@
   <!-- A-Frame library -->
   <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
 
-  <!-- Your main app script -->
+  <!-- Load THREE.js first -->
   <script type="module">
-    // Importing modules based on importmap
     import * as THREE from 'three';
     import { GLTFLoader } from 'GLTFLoader';
-    import 'AR'; // Import AR.js for marker-based AR functionality
-
-    // Wait for Three.js and AR.js to be ready before starting the app
-    window.addEventListener('load', function() {
+    
+    // Load AR.js library after THREE.js
+    const arScript = document.createElement('script');
+    arScript.src = 'https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex.js';
+    document.head.appendChild(arScript);
+    
+    // Wait for AR.js to be loaded before starting the app
+    arScript.onload = () => {
       main();
-    });
+    };
 
     async function main() {
       // --- Basic three.js scene + renderer
